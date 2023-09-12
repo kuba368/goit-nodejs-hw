@@ -48,21 +48,19 @@ const getContactById = async (contactId) => {
 
 const removeContact = async (contactId) => {
   try {
-    try {
-      const contacts = await readContactsFile();
-      const filteredContacts = contacts.filter(
-        (contact) => contact.id !== contactId
-      );
+    const contacts = await readContactsFile();
+    const filteredContacts = contacts.filter(
+      (contact) => contact.id !== contactId
+    );
 
-      if (filteredContacts.length < contacts.length) {
-        await writeContactsFile(filteredContacts);
-      } else {
-        console.log(`Contact with ID ${contactId} not found`.yellow);
-      }
-    } catch (error) {
-      console.error("Error occured when removing contact:".red, error);
+    if (filteredContacts.length < contacts.length) {
+      await writeContactsFile(filteredContacts);
+    } else {
+      console.log(`Contact with ID ${contactId} not found`.yellow);
     }
-  } catch (error) {}
+  } catch (error) {
+    console.error("Error occured when removing contact:".red, error);
+  }
 };
 
 const addContact = async (body) => {

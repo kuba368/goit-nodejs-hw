@@ -38,6 +38,7 @@ mongoose
       console.log(`App listens on port ${PORT}`);
       createFolder(config.UPLOAD_DIR);
       createFolder(config.AVATARS_PATH);
+      createFolder(config.TMP_DIR);
     });
   })
   .catch((error) => {

@@ -8,6 +8,8 @@ const router = express.Router();
 
 router.post("/login", authController.login);
 router.post("/register", authController.register);
+router.get("/current", auth, authController.current);
+router.post("/logout", auth, authController.logout);
 router.patch(
   "/avatars",
   auth,

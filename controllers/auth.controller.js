@@ -6,7 +6,9 @@ const fs = require("node:fs").promises;
 const config = require("../config/config");
 const Jimp = require("jimp");
 const { v4: uuidv4 } = require("uuid");
-const { send } = require("../services/sendGrid");
+const { sendEmail } = require("../services/sendEmail");
+const bcrypt = require("bcryptjs");
+const gravatar = require("gravatar");
 
 const login = async (req, res) => {
   const { email, password } = req.body;
@@ -50,17 +52,31 @@ const register = async (req, res, next) => {
     return HttpError(409, "Email is already in use");
   }
   try {
-    const newUser = new User({ email });
-    newUser.generateAvatar();
-    newUser.setPassword(password);
-    newUser.set("verificationToken", uuidv4());
-    await newUser.save();
-    const verificationToken = newUser.verificationToken;
-    send(email, verificationToken);
+    const hashPassword = await bcrypt.hash(password, 10);
+    const avatarURL = gravatar.url(email);
+    const verificationToken = uuidv4();
+
+    const newUser = await User.create({
+      ...req.body,
+      password: hashPassword,
+      avatarURL,
+      verificationToken,
+    });
+
+    const mail = {
+      to: email,
+      subject: "Verification link",
+      html: `<a target="_blank" href="http://localhost:${process.env.PORT}/api/users/verify/${verificationToken}">Click verify email</a>`,
+    };
+
+    await sendEmail(mail);
+
     return res.status(201).json({
       status: "success",
       code: 201,
       data: {
+        email: newUser.email,
+        subscription: newUser.subscription,
         messsage: "Registration successful",
       },
     });

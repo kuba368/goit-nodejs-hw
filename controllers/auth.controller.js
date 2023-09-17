@@ -5,6 +5,8 @@ const path = require("node:path");
 const fs = require("node:fs").promises;
 const config = require("../config/config");
 const Jimp = require("jimp");
+const { v4: uuidv4 } = require("uuid");
+const { send } = require("../services/sendGrid");
 
 const login = async (req, res) => {
   const { email, password } = req.body;
@@ -12,6 +14,16 @@ const login = async (req, res) => {
 
   if (!user || !user.validPassword(password)) {
     return HttpError(400, "Incorrect login or password");
+  }
+
+  if (!user.verify) {
+    return res.status(403).json({
+      statusText: "",
+      code: 403,
+      ResponseBody: {
+        message: "E-mail is not verified",
+      },
+    });
   }
 
   const payload = {
@@ -41,7 +53,10 @@ const register = async (req, res, next) => {
     const newUser = new User({ email });
     newUser.generateAvatar();
     newUser.setPassword(password);
+    newUser.set("verificationToken", uuidv4());
     await newUser.save();
+    const verificationToken = newUser.verificationToken;
+    send(email, verificationToken);
     return res.status(201).json({
       status: "success",
       code: 201,
@@ -90,10 +105,67 @@ const updateAvatar = async (req, res) => {
   res.status(200).json({ avatarURL });
 };
 
+const verifyEmail = async (req, res) => {
+  try {
+    const { verificationToken } = req.params;
+    const user = await User.findOne({ verificationToken });
+
+    if (!user) {
+      return res.status(404).json({
+        messsage: "User not found",
+      });
+    }
+    user.set("verify", true);
+    user.verificationToken = null;
+    await user.save();
+    return res.status(200).json({
+      messsage: "Verification successful",
+    });
+  } catch (error) {
+    res.status(500).json({
+      messsage: "Internal Server Error",
+    });
+  }
+};
+
+const reverifyEmail = async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      return HttpError(400, "Missing required field email");
+    }
+    const user = await User.findOne({ email });
+
+    if (user.verify) {
+      return res.status(400).json({
+        statusText: "Bad Request",
+        code: 400,
+        ResponseBody: {
+          message: "Verification has already been passed",
+        },
+      });
+    }
+    const verificationToken = user.verificationToken;
+    send(email, verificationToken);
+    res.status(200).json({
+      statusText: "OK",
+      code: 200,
+      ResponseBody: {
+        message: "Verification email sent",
+      },
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+};
+
 module.exports = {
   login,
   register,
   current,
   logout,
   updateAvatar,
+  verifyEmail,
+  reverifyEmail,
 };

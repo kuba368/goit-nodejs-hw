@@ -1,6 +1,10 @@
 const HttpError = require("../helpers/HttpError");
 const User = require("../models/user.model");
 const jwt = require("jsonwebtoken");
+const path = require("node:path");
+const fs = require("node:fs").promises;
+const config = require("../config/config");
+const Jimp = require("jimp");
 
 const login = async (req, res) => {
   const { email, password } = req.body;
@@ -35,6 +39,7 @@ const register = async (req, res, next) => {
   }
   try {
     const newUser = new User({ email });
+    newUser.generateAvatar();
     newUser.setPassword(password);
     await newUser.save();
     return res.status(201).json({
@@ -49,7 +54,24 @@ const register = async (req, res, next) => {
   }
 };
 
+const updateAvatar = async (req, res) => {
+  const { _id } = req.user;
+  const { path: tempUpload, originalname } = req.file;
+  const img = await Jimp.read(tempUpload);
+  await img
+    .autocrop()
+    .cover(250, 250, Jimp.HORIZONTAL_ALIGN_CENTER | Jimp.VERTICAL_ALIGN_MIDDLE)
+    .writeAsync(tempUpload);
+  const filename = `${Date.now()}-${originalname}`;
+  const resultUpload = path.join(config.AVATARS_PATH, filename);
+  await fs.rename(tempUpload, resultUpload);
+  const avatarURL = path.join("avatars", filename);
+  await User.findByIdAndUpdate(_id, { avatarURL });
+  res.status(200).json({ avatarURL });
+};
+
 module.exports = {
   login,
   register,
+  updateAvatar,
 };
